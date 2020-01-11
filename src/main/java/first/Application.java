@@ -15,6 +15,8 @@ public class Application {
 
     public static void main(String[] args) {
 
+        System.setProperty("hadoop.home.dir", "c:/hadoop");
+
         SparkConf conf = new SparkConf()
                 .setAppName("Lesson1")
                 .setMaster("local[*]");
@@ -40,7 +42,7 @@ public class Application {
         logData.add("WARN: Saturday 13 September 1949");
 
         //Input e Map
-        partOne(sc, myIntegerList);
+        /*partOne(sc, myIntegerList);
 
         //RDD di oggetti (WRONG)
         partTwo(sc, myIntegerList);
@@ -58,7 +60,10 @@ public class Application {
         partSix(sc, logData);
 
         //FlatMap
-        partSeven(sc, logData);
+        partSeven(sc, logData);*/
+
+        //Loading from disk
+        partEight(sc);
 
         //Closing SparkContext
         sc.close();
@@ -163,7 +168,7 @@ public class Application {
                 .foreach(element -> System.out.println("LEVEL: " + element._1 + " - MESSAGE: " + element._2));
     }
 
-    //Filter
+    //Filter RDD
     public static void partSeven(JavaSparkContext sc, ArrayList<String> logData) {
 
         System.out.println("\nFilter su RDD:");
@@ -171,6 +176,18 @@ public class Application {
                 .mapToPair(rawValue -> new Tuple2<>(rawValue.split(":")[0], rawValue.split(":")[1]))
                 .filter(value -> value._1.equals("ERROR"))
                 .foreach(element -> System.out.println("LEVEL: " + element._1 + " - MESSAGE: " + element._2));
+    }
+
+    //Filter RDD
+    public static void partEight(JavaSparkContext sc) {
+
+        JavaRDD<String> initialRDD = sc.textFile("src/main/resources/subtitles/input.txt");
+        //JavaRDD<String> initialRDD = sc.textFile("s3://");
+        //JavaRDD<String> initialRDD = sc.textFile("hdfs://");
+
+        System.out.println("\nFilter su RDD:");
+        initialRDD
+                .foreach(element -> System.out.println("String: " +element));
     }
 
 }
