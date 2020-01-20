@@ -1,15 +1,16 @@
 package first;
 
-
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.Optional;
 import scala.Tuple2;
 import scala.Tuple3;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class Application {
 
@@ -60,10 +61,13 @@ public class Application {
         partSix(sc, logData);
 
         //FlatMap
-        partSeven(sc, logData);*/
+        partSeven(sc, logData);
 
         //Loading from disk
-        partEight(sc);
+        partEight(sc);*/
+
+        //Joins
+        partNine(sc);
 
         //Closing SparkContext
         sc.close();
@@ -178,16 +182,63 @@ public class Application {
                 .foreach(element -> System.out.println("LEVEL: " + element._1 + " - MESSAGE: " + element._2));
     }
 
-    //Filter RDD
+    //Sort RDD by Key?
     public static void partEight(JavaSparkContext sc) {
 
         JavaRDD<String> initialRDD = sc.textFile("src/main/resources/subtitles/input.txt");
         //JavaRDD<String> initialRDD = sc.textFile("s3://");
         //JavaRDD<String> initialRDD = sc.textFile("hdfs://");
 
-        System.out.println("\nFilter su RDD:");
-        initialRDD
-                .foreach(element -> System.out.println("String: " +element));
+        System.out.println("\nRDD:");
+        JavaPairRDD<String, Long> filtered = initialRDD
+                .map(element -> element.replaceAll("[^a-zA-Z\\s]", "").toLowerCase())
+                .filter(element -> element.trim().length() >= 1)
+                .flatMap(element -> Arrays.asList(element.split(" ")).iterator())
+                .mapToPair(element -> new Tuple2<>(element, 1L))
+                .reduceByKey((value1, value2) -> value1 + value2);
+
+        JavaPairRDD<Long, String> switched = filtered.mapToPair(tuple -> new Tuple2<>(tuple._2, tuple._1));
+
+        List<Tuple2<Long, String>> results = switched
+                .sortByKey(false)
+                .take(25);
+
+        results.forEach(element -> System.out.println("KEY: " + element._2 + " - Count: " + element._1));
+
+    }
+
+    //Inner, left and right joins
+    public static void partNine(JavaSparkContext sc) {
+
+        ArrayList<Tuple2<Integer, Integer>> visitRaw = new ArrayList<>();
+        visitRaw.add(new Tuple2<>(4, 18));
+        visitRaw.add(new Tuple2<>(6, 4));
+        visitRaw.add(new Tuple2<>(10, 9));
+
+        ArrayList<Tuple2<Integer, String>> usersRaw = new ArrayList<>();
+        usersRaw.add(new Tuple2<>(1, "John"));
+        usersRaw.add(new Tuple2<>(2, "Bob"));
+        usersRaw.add(new Tuple2<>(3, "Alan"));
+        usersRaw.add(new Tuple2<>(4, "Doris"));
+        usersRaw.add(new Tuple2<>(5, "Mary"));
+        usersRaw.add(new Tuple2<>(6, "Frank"));
+
+        JavaPairRDD<Integer, Integer> visits = sc.parallelizePairs(visitRaw);
+        JavaPairRDD<Integer, String> users = sc.parallelizePairs(usersRaw);
+
+        //INNER JOIN
+        System.out.println("Inner Join: ");
+        JavaPairRDD<Integer, Tuple2<Integer, String>> joinedRDD = visits.join(users);
+        joinedRDD.foreach(element -> System.out.println(element._1 +"("+element._2._1+","+element._2._2+")"));
+
+        System.out.println("\nLeft Join: ");
+        JavaPairRDD<Integer, Tuple2<Integer, Optional<String>>> leftJoinedRDD = visits.leftOuterJoin(users);
+        leftJoinedRDD.foreach(element -> System.out.println(element._1 +"("+element._2._1+","+element._2._2+")"));
+
+        System.out.println("\nRight Join: ");
+        JavaPairRDD<Integer, Tuple2<Optional<Integer>, String>> rightJoinedRDD = visits.rightOuterJoin(users);
+        rightJoinedRDD.foreach(element -> System.out.println(element._1 +"("+element._2._1+","+element._2._2+")"));
+
     }
 
 }
